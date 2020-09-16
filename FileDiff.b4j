@@ -1,0 +1,124 @@
+﻿AppType=JavaFX
+Build1=Default,b4j.example
+File1=diffViewer.bjl
+File2=main.bjl
+FileGroup1=Default Group
+FileGroup2=Default Group
+Group=Default Group
+Library1=jcore
+Library2=jfx
+Library3=javaobject
+Module1=Diff
+Module2=tika
+Module3=DiffViewer
+Module4=Utils
+NumberOfFiles=2
+NumberOfLibraries=3
+NumberOfModules=4
+Version=7.8
+@EndOfDesignText@
+#Region Project Attributes 
+	#MainFormWidth: 600
+	#MainFormHeight: 600 
+#End Region
+
+#AdditionalJar: java-diff-utils-4.7
+#AdditionalJar: tika-app-1.20
+
+Sub Process_Globals
+	Private fx As JFX
+	Private MainForm As Form
+	Private DirRadioButton As RadioButton
+	Private NewListView As ListView
+	Private OldListView As ListView
+	Private SingleFileRadioButton As RadioButton
+	Private OnlyDiffCheckBox As CheckBox
+End Sub
+
+Sub AppStart (Form1 As Form, Args() As String)
+	MainForm = Form1
+	MainForm.RootPane.LoadLayout("main") 'Load the layout file.
+	MainForm.Show
+End Sub
+
+'Return true to allow the default exceptions handler to handle the uncaught exception.
+Sub Application_Error (Error As Exception, StackTrace As String) As Boolean
+	Return True
+End Sub
+
+Sub ShowDiffButton_MouseClicked (EventData As MouseEvent)
+	If SingleFileRadioButton.Selected And OldListView.Items.Size>0 Then
+		OldListView.SelectedIndex=0
+	End If
+	If OldListView.SelectedIndex<>-1 Then
+		Dim oldFilename As String=File.GetName(OldListView.SelectedItem)
+		For Each path As String In NewListView.Items
+			If oldFilename=File.GetName(path) Or SingleFileRadioButton.Selected Then 'exist
+				Dim old,new As String
+				old=tika.getText(File.Combine(OldListView.SelectedItem,""))
+				new=tika.getText(File.Combine(path,""))
+				Log(old)
+				Log(new)
+				Dim dv As DiffViewer
+				dv.Initialize
+				dv.show
+				dv.loadHtml(Utils.DiffTable(old,new,OnlyDiffCheckBox.Checked))
+			End If
+		Next
+	End If
+End Sub
+
+Sub GenerateButton_MouseClicked (EventData As MouseEvent)
+	If OldListView.Items.Size=0 Then
+		Return
+	End If
+	Dim outputPath As String
+	outputPath=File.Combine(File.GetFileParent(OldListView.Items.Get(0)),"out")
+	If File.Exists(outputPath,"")=False Then
+		File.MakeDir(outputPath,"")
+	End If
+	For Each oldFilePath As String In OldListView.Items
+		Dim oldFilename As String=File.GetName(oldFilePath)
+		For Each newFilePath As String In NewListView.Items
+			Dim newFilename As String=File.GetName(newFilePath)
+			If oldFilename=newFilename Or SingleFileRadioButton.Selected Then
+				Log(oldFilePath)
+				Log(newFilePath)
+				Dim old,new As String
+				old=tika.getText(File.Combine(oldFilePath,""))
+				new=tika.getText(File.Combine(newFilePath,""))
+				Log("done")
+				File.WriteString(outputPath,oldFilename&"-diff.html",Utils.DiffTable(old,new,OnlyDiffCheckBox.Checked))
+			End If
+		Next
+	Next
+End Sub
+
+Sub ChooseOldButton_MouseClicked (EventData As MouseEvent)
+	AppendFilesToListView(OldListView)
+End Sub
+
+Sub ChooseNewButton_MouseClicked (EventData As MouseEvent)
+	AppendFilesToListView(NewListView)
+End Sub
+
+Sub AppendFilesToListView(targetLV As ListView)
+	targetLV.Items.Clear
+	If SingleFileRadioButton.Selected Then
+		Dim fc As FileChooser
+		fc.Initialize
+		Dim path As String=fc.ShowOpen(MainForm)
+		If File.Exists(path,"") Then
+			targetLV.Items.Add(path)
+		End If
+	else if DirRadioButton.Selected Then
+		Dim dc As DirectoryChooser
+		dc.Initialize
+		Dim path As String=dc.Show(MainForm)
+		If File.Exists(path,"") Then
+			For Each filename As String In File.ListFiles(path)
+				targetLV.Items.Add(File.Combine(path,filename))
+			Next
+		End If
+	End If
+End Sub
